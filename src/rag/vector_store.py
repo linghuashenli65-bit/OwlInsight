@@ -32,6 +32,10 @@ class VectorStore:
             raise RuntimeError("请先调用 connect() 连接 Milvus")
         return self._client
 
+    def is_connected(self) -> bool:
+        """检查是否已连接到 Milvus."""
+        return self._client is not None
+
     def create_collection(self, overwrite: bool = False) -> None:
         """创建 collection，如已存在且 overwrite=True 则删除重建."""
         if self.client.has_collection(self._collection_name):
@@ -48,14 +52,14 @@ class VectorStore:
         schema.add_field("id", DataType.INT64, is_primary=True)
         schema.add_field("vector", DataType.FLOAT_VECTOR, dim=self._dim)
         schema.add_field("text", DataType.VARCHAR, max_length=65535)
-        # 常用元数据字段
-        schema.add_field("company", DataType.VARCHAR, max_length=128)
-        schema.add_field("company_code", DataType.VARCHAR, max_length=32)
-        schema.add_field("doc_type", DataType.VARCHAR, max_length=32)
-        schema.add_field("doc_name", DataType.VARCHAR, max_length=256)
-        schema.add_field("period_rank", DataType.INT64)
-        schema.add_field("report_date", DataType.VARCHAR, max_length=16)
-        schema.add_field("table_flag", DataType.BOOL)
+        # 常用元数据字段（nullable=True 兼容旧数据缺失的场景）
+        schema.add_field("company", DataType.VARCHAR, max_length=128, nullable=True)
+        schema.add_field("company_code", DataType.VARCHAR, max_length=32, nullable=True)
+        schema.add_field("doc_type", DataType.VARCHAR, max_length=32, nullable=True)
+        schema.add_field("doc_name", DataType.VARCHAR, max_length=256, nullable=True)
+        schema.add_field("period_rank", DataType.INT64, nullable=True)
+        schema.add_field("report_date", DataType.VARCHAR, max_length=16, nullable=True)
+        schema.add_field("table_flag", DataType.BOOL, nullable=True)
 
         index_params = self.client.prepare_index_params()
         index_params.add_index(
@@ -97,11 +101,13 @@ class VectorStore:
         if not records:
             return []
         result = self.client.insert(self._collection_name, records)
+        # 插入后 flush，确保后续搜索能立即检索到
+        self.client.flush(collection_name=self._collection_name)
         return result["ids"]
 
     def delete(self, ids: list[int]) -> None:
         """按主键 ID 删除."""
-        self.client.delete(self._collection_name, ids)
+        self.client.delete(self._collection_name, list(ids))
 
     def delete_by_filter(self, expr: str) -> None:
         """按表达式删除，例如 'company_code == \"600519\"'."""

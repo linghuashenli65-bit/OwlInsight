@@ -44,11 +44,21 @@ def _find_col(columns: list[str], *keywords: str) -> Optional[str]:
     return None
 
 def _to_symbol(code: str) -> str:
-    """转为 akshare 所需的 symbol 格式."""
+    """转为 akshare 所需的 symbol 格式.
+
+    规则：6 开头 → 上海 A 股；0/3 开头 → 深圳 A 股；5 位纯数字 → 港股.
+    """
+    if len(code) == 5:
+        return f"{code}.HK"
     return f"{code}.SH" if code.startswith("6") else f"{code}.SZ"
 
 def _to_tx_symbol(code: str) -> str:
-    """转为腾讯接口所需的 symbol 格式 (sh/sz 前缀)."""
+    """转为腾讯接口所需的 symbol 格式 (sh/sz 前缀).
+
+    规则：6 开头 → sh；0/3 开头 → sz；5 位纯数字 → hk.
+    """
+    if len(code) == 5:
+        return f"hk{code}"
     return f"sh{code}" if code.startswith("6") else f"sz{code}"
 
 
@@ -60,8 +70,10 @@ def get_financials(symbol: str, period: str = "annual") -> list[dict[str, Any]]:
     使用 ak.stock_yjbb_em（业绩报表），比 stock_profit_sheet_by_report_em 更稳定。
     period 参数仅用于控制备选接口切换，yjbb_em 始终返回最新季度。
     """
+    # 动态计算最近一个完整年度的 12 月 31 日，避免硬编码日期过期
+    latest_year_end = f"{date.today().year - 1}1231"
     try:
-        df = ak.stock_yjbb_em(date="20241231")
+        df = ak.stock_yjbb_em(date=latest_year_end)
     except Exception as e:
         logger.warning("stock_yjbb_em 失败，尝试备用接口: %s", e)
         try:
