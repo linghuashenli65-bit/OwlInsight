@@ -379,6 +379,9 @@ def _run_tool(plan: ToolPlan, state: Optional[dict] = None) -> dict[str, Any]:
 
         if not last_assistant:
             return {"status": "empty", "data": [], "message": "没有可保存的分析内容"}
+        # 检查内容是否有效（过滤空/错误信息）
+        if len(last_assistant.strip()) < 15 or "暂未获取" in last_assistant or "没有可保存" in last_assistant:
+            return {"status": "empty", "data": [], "message": "当前没有有效的分析结果可保存，请先完成一次分析"}
         # LLM 生成标题和摘要
         title = _generate_note_summary(last_assistant, company_name or company_code)
         abstract = _generate_note_abstract(last_assistant)

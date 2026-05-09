@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { FileText, ExternalLink, Search, X, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { useSidebarStore } from '@/store/sidebarStore'
@@ -9,6 +11,14 @@ import type { ResearchNote } from '@/lib/types'
 
 interface GroupedNotes {
   [company: string]: ResearchNote[]
+}
+
+function _fmtTime(t: string): string {
+  if (!t) return ''
+  // SQLite timestamp: "2026-05-08 19:51:17" or ISO: "2026-05-08T19:51:17"
+  const d = t.includes('T') ? t.split('T')[0] : t.slice(0, 10)
+  const time = t.includes('T') ? t.split('T')[1]?.slice(0, 5) : t.slice(11, 16)
+  return time ? `${d} ${time}` : d
 }
 
 export function NotesPage() {
@@ -22,8 +32,6 @@ export function NotesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<ResearchNote[] | null>(null)
   const [isSearching, setIsSearching] = useState(false)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
-
   useEffect(() => {
     fetchNotes()
   }, [])
@@ -47,30 +55,30 @@ export function NotesPage() {
 
   const handlePreview = async (note: ResearchNote) => {
     try {
-      const detail = await api.notes.get(note.path)
+      let detail: { content: string }
+      if (note.id != null) {
+        detail = await api.notes.getById(note.id)
+      } else {
+        detail = await api.notes.get(note.path)
+      }
       setPreviewNote({
-        filename: note.filename || note.path.split('/').pop() || '笔记',
+        filename: note.title || note.filename || note.company_name || note.company || '笔记',
         content: detail.content || '',
       })
     } catch {
       setPreviewNote({
-        filename: note.filename || '笔记',
+        filename: note.title || '笔记',
         content: '无法加载笔记内容',
       })
     }
   }
 
-  const handleDeleteNote = async (noteId: number) => {
-    if (deletingId === noteId) {
-      try {
-        await api.notes.delete(noteId)
-        fetchNotes()
-      } catch { /* ignore */ }
-      setDeletingId(null)
-    } else {
-      setDeletingId(noteId)
-      setTimeout(() => setDeletingId(null), 2000)
-    }
+  const handleDeleteNote = async (noteId: number, title: string) => {
+    if (!window.confirm(`确定删除笔记「${title}」吗？`)) return
+    try {
+      await api.notes.delete(noteId)
+      fetchNotes()
+    } catch { /* ignore */ }
   }
 
   // 按公司分组
@@ -196,34 +204,38 @@ export function NotesPage() {
                         <div
                           className="truncate"
                           style={{
-                            fontSize: '0.8rem',
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            color: 'var(--text)',
                             fontFamily: 'Georgia, "Noto Serif SC", serif',
                           }}
                         >
-                          {searchQuery ? highlightText(note.company_name || note.company || '', searchQuery) : (note.filename || note.path?.split('/').pop())}
+                          {searchQuery
+                            ? highlightText(note.title || note.filename || note.company_name || note.company || '笔记', searchQuery)
+                            : (note.title || note.filename || note.path?.split('/').pop() || '笔记')}
                         </div>
-                        {note.preview && (
-                          <div
-                            className="truncate mt-0.5 text-[0.65rem]"
-                            style={{ color: 'var(--text-muted)' }}
-                          >
-                            {searchQuery ? highlightText(note.preview, searchQuery) : note.preview}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                            {_fmtTime(note.updated_at || note.created_at || note.created || '')}
+                          </span>
+                          {note.preview && (
+                            <span
+                              className="truncate text-[0.65rem]"
+                              style={{ color: 'var(--text-muted)', maxWidth: '200px' }}
+                            >
+                              {searchQuery ? highlightText(note.preview, searchQuery) : note.preview}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-                        {note.created?.split('T')[0] || note.updated_at?.split('T')[0] || ''}
-                      </span>
                       <ExternalLink size={12} style={{ flexShrink: 0, opacity: 0.4 }} />
                     </button>
                     {note.id != null && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id!) }}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id!, note.title || note.company || '笔记') }}
                         className="p-1.5 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                        style={{
-                          color: deletingId === note.id ? 'var(--vermillion)' : 'var(--text-muted)',
-                        }}
-                        title={deletingId === note.id ? '确认删除' : '删除笔记'}
+                        style={{ color: 'var(--text-muted)' }}
+                        title="删除笔记"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -269,17 +281,18 @@ export function NotesPage() {
                 &times;
               </button>
             </div>
-            <pre
+            <div className="prose prose-sm max-w-none"
               style={{
-                fontSize: '0.75rem',
-                lineHeight: 1.8,
                 color: 'var(--text)',
-                whiteSpace: 'pre-wrap',
                 fontFamily: 'Georgia, "Noto Serif SC", serif',
+                fontSize: '0.8rem',
+                lineHeight: 1.8,
               }}
             >
-              {previewNote.content}
-            </pre>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {previewNote.content}
+              </ReactMarkdown>
+            </div>
           </div>
         </div>
       )}

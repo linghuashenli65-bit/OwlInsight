@@ -36,6 +36,9 @@ async def lifespan(app: FastAPI):
     # 初始化 SQLite 连接
     from backend.memory.store import memory_store
     memory_store.connect()
+    # 初始化 Milvus 连接
+    from backend.rag.vector_store import vector_store
+    vector_store.connect()
     # 启动告警调度引擎
     alert_engine.start()
     yield

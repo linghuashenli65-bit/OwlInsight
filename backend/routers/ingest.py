@@ -28,6 +28,30 @@ def list_documents():
     return result
 
 
+@router.get("/documents/{doc_name:path}/content")
+def get_document_content(doc_name: str):
+    """获取文档的完整内容（所有文本块）. """
+    import urllib.parse
+    decoded = urllib.parse.unquote(doc_name)
+    vector_store.connect()
+    chunks = vector_store.query(
+        expr=f'doc_name == "{decoded}"',
+        output_fields=["id", "text", "summary", "period_rank", "table_flag"],
+    )
+    # 按 id 排序
+    chunks.sort(key=lambda c: c.get("id", 0))
+    # 将 table_flag 转为 bool
+    for c in chunks:
+        c["table_flag"] = bool(c.get("table_flag"))
+    content = "\n\n".join(c.get("text", "") for c in chunks)
+    return {
+        "doc_name": decoded,
+        "chunks": chunks,
+        "content": content,
+        "chunk_count": len(chunks),
+    }
+
+
 @router.delete("/documents")
 def delete_document(doc_name: str):
     """按 doc_name 删除文档（从 Milvus 删除所有相关 chunks）. """

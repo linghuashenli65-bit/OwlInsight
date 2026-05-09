@@ -20,7 +20,7 @@ from langchain_openai import ChatOpenAI
 from backend.agent.state import ToolPlan
 from backend.config import settings
 from backend.memory.store import memory_store
-from backend.stock_map import COMMON_STOCKS, INDEX_CODES
+from backend.stock_map import COMMON_STOCKS, INDEX_CODES, US_TO_HK_STOCKS, _US_NAME_MAP
 
 # 意图分类 prompt
 _INTENT_CLASSIFY_PROMPT = """你是一个投资研究助手 FinanceBot 的意图分类器。
@@ -110,10 +110,34 @@ def classify_intent(user_input: str, context: str = "") -> dict[str, Any]:
                     result.get("intent"), result.get("confidence", 0), elapsed)
         # 清洗 LLM 返回的公司代码：去除交易所后缀
         if result.get("company_code"):
-            code = re.sub(r"\.(SH|SZ|HK|sh|sz|hk)$", "", result["company_code"])
-            if code.isdigit() and len(code) == 4:
-                code = "0" + code
-            result["company_code"] = code
+            raw_code = result["company_code"].strip().upper()
+            code = re.sub(r"\.(SH|SZ|HK|sh|sz|hk)$", "", raw_code)
+            # 逗号分隔的多公司代码（如 "600519.SH,000858" → "600519,000858"）
+            if "," in code:
+                parts = [c.strip() for c in code.split(",") if c.strip()]
+                cleaned = []
+                for p in parts:
+                    p = re.sub(r"\.(SH|SZ|HK|sh|sz|hk)$", "", p)
+                    if p.isdigit() and len(p) in (5, 6):
+                        cleaned.append(p.zfill(6))
+                if cleaned:
+                    result["company_code"] = ",".join(cleaned)
+                else:
+                    logger.info("LLM 返回多代码 %s，将由公司名重新匹配", code)
+                    result["company_code"] = ""
+            elif not (code.isdigit() and len(code) in (5, 6)):
+                hk_code = US_TO_HK_STOCKS.get(raw_code, US_TO_HK_STOCKS.get(code, ""))
+                if hk_code:
+                    result["company_code"] = hk_code
+                elif code.isalpha() and code in _US_NAME_MAP:
+                    result["company_code"] = code
+                else:
+                    logger.info("LLM 返回非标准代码 %s，将由公司名重新匹配", code)
+                    result["company_code"] = ""
+            else:
+                if len(code) == 4:
+                    code = "0" + code
+                result["company_code"] = code
     except Exception as e:
         logger.warning("LLM 意图分类失败 (%s), 使用规则 fallback: %s", e.__class__.__name__, e)
         result = _rule_based_classify(user_input)
@@ -293,6 +317,16 @@ def _extract_multiple_companies(intent_result: dict) -> list[tuple[str, str]]:
                 seen.add(code)
                 result.append((name, code))
                 break
+    # 从 company_code 补充（逗号分隔的多代码）
+    if len(result) < 2:
+        codes_str = intent_result.get("company_code", "")
+        if "," in codes_str:
+            for code in codes_str.split(","):
+                code = code.strip()
+                if code and code not in seen:
+                    seen.add(code)
+                    result.append((code, code))
+
     # 从 company 和 user_query 补充
     user_query = intent_result.get("user_query", "")
     if not result and user_query:

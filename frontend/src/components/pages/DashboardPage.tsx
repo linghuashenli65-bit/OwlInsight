@@ -1,14 +1,14 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { TrendingUp, TrendingDown, BarChart3, MessageSquare, BookOpen, Newspaper, ArrowUpDown } from 'lucide-react'
 import { useChatStore } from '@/store/chatStore'
 import { useNavStore } from '@/store/navStore'
+import { useLivePriceStore } from '@/store/livePriceStore'
 import { StockDetail } from '@/components/chat/StockDetail'
 import type { AppView } from '@/lib/types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8897'
-const WS_URL = (process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8897') + '/ws/prices'
 
 interface DashboardData {
   companies: Array<{
@@ -26,9 +26,8 @@ type SortMode = 'default' | 'gain' | 'loss'
 export function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('default')
-  const [livePrices, setLivePrices] = useState<Record<string, { price: number; change_pct: number }>>({})
+  const livePrices = useLivePriceStore((s) => s.livePrices)
   const [selectedStock, setSelectedStock] = useState<{ code: string; name: string; price: number | null; changePct: number | null } | null>(null)
-  const wsRef = useRef<WebSocket | null>(null)
   const navigate = useNavStore((s) => s.navigate)
   const createNewConversation = useChatStore((s) => s.createNewConversation)
   const sendMessage = useChatStore((s) => s.sendMessage)
@@ -38,63 +37,6 @@ export function DashboardPage() {
       .then((r) => r.json())
       .then(setData)
       .catch(() => {})
-  }, [])
-
-  // WebSocket 连接（指数退避重连，最大 30 秒间隔）
-  useEffect(() => {
-    let ws: WebSocket | null = null
-    let reconnectTimer: ReturnType<typeof setTimeout>
-    let retryCount = 0
-    const MAX_RETRY_INTERVAL = 30000
-
-    function connect() {
-      try {
-        ws = new WebSocket(WS_URL)
-        wsRef.current = ws
-
-        ws.onmessage = (ev) => {
-          try {
-            const msg = JSON.parse(ev.data)
-            if (msg.type === 'snapshot' || msg.type === 'update') {
-              const updates: Record<string, { price: number; change_pct: number }> = {}
-              const items = Array.isArray(msg.data) ? msg.data : []
-              for (const item of items) {
-                if (item.code && item.price != null) {
-                  updates[item.code] = { price: item.price, change_pct: item.change_pct ?? 0 }
-                }
-              }
-              if (Object.keys(updates).length > 0) {
-                setLivePrices((prev) => ({ ...prev, ...updates }))
-              }
-            }
-          } catch {}
-          // 连接成功后重置重试计数
-          retryCount = 0
-        }
-
-        ws.onopen = () => { retryCount = 0 }
-
-        ws.onclose = () => {
-          const delay = Math.min(5000 * Math.pow(1.5, retryCount), MAX_RETRY_INTERVAL)
-          retryCount++
-          reconnectTimer = setTimeout(connect, delay)
-        }
-        ws.onerror = () => {
-          ws?.close()
-        }
-      } catch {
-        const delay = Math.min(5000 * Math.pow(1.5, retryCount), MAX_RETRY_INTERVAL)
-        retryCount++
-        reconnectTimer = setTimeout(connect, delay)
-      }
-    }
-
-    connect()
-
-    return () => {
-      clearTimeout(reconnectTimer)
-      ws?.close()
-    }
   }, [])
 
   // 合并实时价格

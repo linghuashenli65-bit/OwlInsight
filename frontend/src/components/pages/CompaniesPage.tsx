@@ -14,8 +14,6 @@ export function CompaniesPage() {
   const fetchCompanies = useSidebarStore((s) => s.fetchCompanies)
   const sendMessage = useChatStore((s) => s.sendMessage)
   const navigate = useNavStore((s) => s.navigate)
-  const [deleting, setDeleting] = useState<string | null>(null)
-
   useEffect(() => {
     fetchCompanies()
   }, [])
@@ -25,17 +23,12 @@ export function CompaniesPage() {
     setTimeout(() => sendMessage(`分析${companyName}最新财务`), 100)
   }
 
-  const handleDelete = async (code: string) => {
-    if (deleting === code) {
-      try {
-        await api.companies.delete(code)
-        fetchCompanies()
-      } catch { /* ignore */ }
-      setDeleting(null)
-    } else {
-      setDeleting(code)
-      setTimeout(() => setDeleting(null), 2000)
-    }
+  const handleDelete = async (code: string, name: string) => {
+    if (!window.confirm(`确定取消关注「${name}」吗？`)) return
+    try {
+      await api.companies.delete(code)
+      fetchCompanies()
+    } catch { /* ignore */ }
   }
 
   // 按分析次数降序排列
@@ -100,15 +93,12 @@ export function CompaniesPage() {
                 <div className="flex items-center gap-2">
                   <TrendingUp size={16} style={{ color: 'var(--gold)', opacity: 0.6 }} />
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(company.company_code) }}
-                    className="p-1 transition-colors rounded"
-                    style={{
-                      color: deleting === company.company_code ? 'var(--vermillion)' : 'var(--text-muted)',
-                      opacity: 0.5,
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(company.company_code, company.company_name) }}
+                    className="p-1 transition-opacity rounded"
+                    style={{ color: 'var(--text-muted)', opacity: 0.5 }}
                     onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
                     onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5' }}
-                    title={deleting === company.company_code ? '确认删除' : '取消关注'}
+                    title="删除"
                   >
                     <Trash2 size={13} />
                   </button>

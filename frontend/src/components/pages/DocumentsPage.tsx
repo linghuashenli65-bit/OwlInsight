@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FileText, BookOpen, RefreshCw, Trash2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { FileText, BookOpen, RefreshCw, Trash2, ExternalLink } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { api } from '@/lib/api'
 
@@ -17,7 +19,11 @@ export function DocumentsPage() {
   const [documents, setDocuments] = useState<DocInfo[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [deletingName, setDeletingName] = useState<string | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<{
+    doc_name: string
+    content: string
+    loading: boolean
+  } | null>(null)
 
   const fetchDocuments = async () => {
     setIsLoading(true)
@@ -33,15 +39,21 @@ export function DocumentsPage() {
   }
 
   const handleDelete = async (docName: string) => {
-    if (deletingName === docName) {
-      try {
-        await api.ingest.delete(docName)
-        fetchDocuments()
-      } catch { /* ignore */ }
-      setDeletingName(null)
-    } else {
-      setDeletingName(docName)
-      setTimeout(() => setDeletingName(null), 2000)
+    if (!window.confirm(`确定删除文档「${docName}」吗？`)) return
+    try {
+      await api.ingest.delete(docName)
+      fetchDocuments()
+    } catch { /* ignore */ }
+  }
+
+  const handlePreview = async (doc: DocInfo) => {
+    setPreviewDoc({ doc_name: doc.doc_name, content: '', loading: true })
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8897'}/api/ingest/documents/${encodeURIComponent(doc.doc_name)}/content`)
+      const data = await res.json()
+      setPreviewDoc({ doc_name: doc.doc_name, content: data.content || '（文档内容为空）', loading: false })
+    } catch {
+      setPreviewDoc({ doc_name: doc.doc_name, content: '无法加载文档内容', loading: false })
     }
   }
 
@@ -103,9 +115,11 @@ export function DocumentsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 max-w-3xl" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           {documents.map((doc) => (
             <div key={doc.doc_name} style={cardStyle}
+              className="cursor-pointer"
+              onClick={() => handlePreview(doc)}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--gold)' }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-faint)' }}
             >
@@ -153,22 +167,75 @@ export function DocumentsPage() {
                     </span>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(doc.doc_name)}
-                  className="p-1 transition-opacity rounded"
-                  style={{
-                    color: deletingName === doc.doc_name ? 'var(--vermillion)' : 'var(--text-muted)',
-                    opacity: 0.4,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4' }}
-                  title={deletingName === doc.doc_name ? '确认删除' : '删除文档'}
-                >
-                  <Trash2 size={13} />
-                </button>
+                <div className="flex flex-col gap-1">
+                  <ExternalLink size={12} style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(doc.doc_name) }}
+                    className="p-1 transition-opacity rounded"
+                    style={{ color: 'var(--text-muted)', opacity: 0.4 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4' }}
+                    title="删除文档"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 文档预览弹窗 */}
+      {previewDoc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setPreviewDoc(null)}
+        >
+          <div
+            className="max-w-3xl max-h-[80vh] w-[90vw] overflow-y-auto p-6 rounded"
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--border-faint)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2
+                style={{
+                  fontSize: '0.9rem',
+                  fontWeight: 500,
+                  color: 'var(--text)',
+                  fontFamily: 'Georgia, "Noto Serif SC", serif',
+                }}
+              >
+                {previewDoc.doc_name}
+              </h2>
+              <button
+                onClick={() => setPreviewDoc(null)}
+                style={{ color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}
+              >
+                &times;
+              </button>
+            </div>
+            {previewDoc.loading ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>加载中...</p>
+            ) : (
+              <div className="prose prose-sm max-w-none"
+                style={{
+                  color: 'var(--text)',
+                  fontFamily: 'Georgia, "Noto Serif SC", serif',
+                  fontSize: '0.8rem',
+                  lineHeight: 1.8,
+                }}
+              >
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {previewDoc.content}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.memory.store import memory_store
-from backend.tools.note_tools import list_research_notes
 from backend.database import get_db
 from backend.database.crud import get_company, list_companies
 from backend.logger import logger
@@ -147,11 +146,7 @@ def get_notes():
         return cached
     memory_store.connect()
     sqlite_notes = memory_store.get_all_notes(limit=50)
-    if sqlite_notes:
-        result = {"notes": sqlite_notes}
-    else:
-        notes = list_research_notes(limit=20)
-        result = {"notes": notes}
+    result = {"notes": sqlite_notes}
     cache_set_json("notes_list", result, ttl=60)
     return result
 
@@ -177,9 +172,19 @@ def search_notes(q: str = ""):
     return {"notes": notes}
 
 
+@router.get("/notes/detail/{note_id}")
+def get_note_content(note_id: int):
+    """获取 SQLite 笔记完整内容（按 ID）. """
+    memory_store.connect()
+    note = memory_store.get_note_by_id(note_id)
+    if note:
+        return {"content": note.get("content", "")}
+    return {"error": "笔记不存在", "content": ""}
+
+
 @router.get("/notes/{path:path}")
 def get_note_detail(path: str):
-    """获取指定笔记详情 (path 为完整文件路径). """
+    """获取文件笔记详情 (path 为完整文件路径). """
     fp = Path(path)
     if fp.exists():
         return {"content": fp.read_text("utf-8")}

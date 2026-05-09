@@ -12,6 +12,7 @@ import { DocumentsPage } from '@/components/pages/DocumentsPage'
 import { useChatStore } from '@/store/chatStore'
 import { useSidebarStore } from '@/store/sidebarStore'
 import { useNavStore } from '@/store/navStore'
+import { initLivePrices } from '@/store/livePriceStore'
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -28,6 +29,7 @@ export default function Home() {
     fetchConversationList()
     fetchCompanies()
     fetchNotes()
+    initLivePrices()  // 全局单例 WebSocket，跨页面共享
   }, [])
 
   const renderMain = () => {

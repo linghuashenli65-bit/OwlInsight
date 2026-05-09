@@ -66,6 +66,56 @@ COMMON_STOCKS: dict[str, str] = {
     "中石化": "00386",
     "中国石化": "00386",
     "联想集团": "00992",
+    # 美股
+    "苹果": "AAPL",
+    "苹果公司": "AAPL",
+    "微软": "MSFT",
+    "微软公司": "MSFT",
+    "谷歌": "GOOGL",
+    "谷歌公司": "GOOGL",
+    "Google": "GOOGL",
+    "亚马逊": "AMZN",
+    "特斯拉": "TSLA",
+    "特斯拉公司": "TSLA",
+    "Meta": "META",
+    "脸书": "META",
+    "英伟达": "NVDA",
+    "NVIDIA": "NVDA",
+    "台积电": "TSM",
+    "伯克希尔": "BRK.B",
+    "伯克希尔哈撒韦": "BRK.B",
+    "强生": "JNJ",
+    "沃尔玛": "WMT",
+    "Visa": "V",
+    "万事达": "MA",
+    "迪士尼": "DIS",
+    "可口可乐": "KO",
+    "百事可乐": "PEP",
+    "麦当劳": "MCD",
+    "耐克": "NKE",
+    "奈飞": "NFLX",
+    "Netflix": "NFLX",
+    "Adobe": "ADBE",
+    "英特尔": "INTC",
+    "Intel": "INTC",
+    "AMD": "AMD",
+    "超威半导体": "AMD",
+    "IBM": "IBM",
+    "甲骨文": "ORCL",
+    "思科": "CSCO",
+    "高通": "QCOM",
+    "博通": "AVGO",
+    "德州仪器": "TXN",
+    "应用材料": "AMAT",
+    "阿斯麦": "ASML",
+    "ASML": "ASML",
+    "优步": "UBER",
+    "Uber": "UBER",
+    "Salesforce": "CRM",
+    "PayPal": "PYPL",
+    "贝宝": "PYPL",
+    "拼多多": "PDD",
+    "PDD": "PDD",
 }
 
 # 大盘指数代码映射
@@ -81,6 +131,37 @@ INDEX_CODES: dict[str, str] = {
     "沪深300": "000300",
     "科创50": "000688",
 }
+
+
+# ──────────────────── US 中概股代码 → 港股/A股代码 ────────────────────
+# 当 LLM 返回美股代码时，翻译为系统支持的港股/A股代码
+US_TO_HK_STOCKS: dict[str, str] = {
+    "BABA": "09988",      # 阿里巴巴
+    "TCEHY": "00700",     # 腾讯控股 (ADR)
+    "TCTZF": "00700",     # 腾讯控股 (OTC)
+    "NTES": "09999",      # 网易
+    "BIDU": "09888",      # 百度
+    "JD": "09618",        # 京东
+    "JDCF": "09618",      # 京东 (OTC)
+    "MPNGY": "03690",     # 美团 (OTC)
+    "MPNGF": "03690",     # 美团 (OTC)
+    "XIAOMI": "01810",    # 小米集团 (OTC)
+    "XIACY": "01810",     # 小米集团 (OTC)
+    "KUAISHOU": "01024",  # 快手 (OTC)
+    "TME": "01698",       # 腾讯音乐
+    "WBD": "09626",       # 哔哩哔哩
+    "BILI": "09626",      # 哔哩哔哩
+    "YUMC": "09987",      # 百胜中国
+    "ZTO": "02057",       # 中通快递
+    "NIO": "09866",       # 蔚来
+    "LI": "02015",        # 理想汽车
+    "XPEV": "09868",      # 小鹏汽车
+}
+
+
+# ──────────────────── 美股代码反向查找（ticker → 中文名） ────────────────────
+
+_US_NAME_MAP: dict[str, str] = {code: name for name, code in COMMON_STOCKS.items() if not code.isdigit()}
 
 
 def lookup_company_code(company_name: str) -> str:

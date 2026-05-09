@@ -40,7 +40,7 @@ const DEFAULT_EMAIL: EmailPrefs = {
 
 export function SettingsPage() {
   const [form, setForm] = useState<AppSettings>(DEFAULT_SETTINGS)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
   // Email 配置
   const [emailPrefs, setEmailPrefs] = useState<EmailPrefs>(DEFAULT_EMAIL)
@@ -51,41 +51,58 @@ export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'general' | 'email' | 'thresholds'>('general')
 
   useEffect(() => {
-    Promise.all([
-      api.settings.get().catch(() => ({} as Record<string, string | number>)),
-      api.alerts.getPreferences().catch(() => ({ preferences: {} as Record<string, string> })),
-      api.alerts.getConfig().catch(() => ({ configs: [] as AlertConfig[], preferences: {} as Record<string, string> })),
-    ]).then(([settingsData, prefData, configData]) => {
-      // 通用设置
-      if (settingsData && Object.keys(settingsData).length > 0) {
-        setForm({
-          theme: (settingsData.theme as string) || DEFAULT_SETTINGS.theme,
-          language: (settingsData.language as string) || DEFAULT_SETTINGS.language,
-          llm_provider: (settingsData.llm_provider as string) || DEFAULT_SETTINGS.llm_provider,
-          llm_model: (settingsData.llm_model as string) || DEFAULT_SETTINGS.llm_model,
-          temperature: Number(settingsData.temperature) || DEFAULT_SETTINGS.temperature,
-        })
-      }
+    // 页面直接渲染，后台加载数据填充
+    const timeout = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
 
-      // 邮件偏好
-      const prefs: Record<string, string> = prefData.preferences || {}
-      setEmailPrefs({
-        alert_email_enabled: prefs.alert_email_enabled || 'false',
-        alert_email_smtp_host: prefs.alert_email_smtp_host || '',
-        alert_email_smtp_port: prefs.alert_email_smtp_port || '587',
-        alert_email_user: prefs.alert_email_user || '',
-        alert_email_password: prefs.alert_email_password || '',
-        alert_email_from: prefs.alert_email_from || '',
-        alert_email_to: prefs.alert_email_to || '',
-        alert_email_premarket_time: prefs.alert_email_premarket_time || '08:30',
-        alert_email_postmarket_time: prefs.alert_email_postmarket_time || '15:30',
-      })
+    const loadSettings = async () => {
+      // 通用设置（MySQL，加 3s 超时避免卡死）
+      try {
+        const settingsData = await Promise.race([
+          api.settings.get(),
+          timeout(3000),
+        ]) as Record<string, string | number>
+        if (settingsData && Object.keys(settingsData).length > 0) {
+          setForm({
+            theme: (settingsData.theme as string) || DEFAULT_SETTINGS.theme,
+            language: (settingsData.language as string) || DEFAULT_SETTINGS.language,
+            llm_provider: (settingsData.llm_provider as string) || DEFAULT_SETTINGS.llm_provider,
+            llm_model: (settingsData.llm_model as string) || DEFAULT_SETTINGS.llm_model,
+            temperature: Number(settingsData.temperature) || DEFAULT_SETTINGS.temperature,
+          })
+        }
+      } catch { /* MySQL 不可用时保持默认值 */ }
 
-      // 告警阈值
-      setAlertConfigs((configData.configs || []) as AlertConfig[])
+      // SQLite 请求（并发）
+      await Promise.allSettled([
+        (async () => {
+          try {
+            const prefData = await api.alerts.getPreferences()
+            const prefs: Record<string, string> = prefData.preferences || {}
+            setEmailPrefs({
+              alert_email_enabled: prefs.alert_email_enabled || 'false',
+              alert_email_smtp_host: prefs.alert_email_smtp_host || '',
+              alert_email_smtp_port: prefs.alert_email_smtp_port || '587',
+              alert_email_user: prefs.alert_email_user || '',
+              alert_email_password: prefs.alert_email_password || '',
+              alert_email_from: prefs.alert_email_from || '',
+              alert_email_to: prefs.alert_email_to || '',
+              alert_email_premarket_time: prefs.alert_email_premarket_time || '08:30',
+              alert_email_postmarket_time: prefs.alert_email_postmarket_time || '15:30',
+            })
+          } catch { /* ignore */ }
+        })(),
+        (async () => {
+          try {
+            const configData = await api.alerts.getConfig()
+            setAlertConfigs((configData.configs || []) as AlertConfig[])
+          } catch { /* ignore */ }
+        })(),
+      ])
 
       setLoading(false)
-    }).catch(() => setLoading(false))
+    }
+
+    loadSettings()
   }, [])
 
   const handleSaveGeneral = async () => {
@@ -151,15 +168,6 @@ export function SettingsPage() {
     fontFamily: 'Georgia, "Noto Serif SC", serif',
     transition: 'all 0.2s',
   })
-
-  if (loading) {
-    return (
-      <div className="flex-1 p-8">
-        <PageHeader title="设置" description="应用配置" />
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>加载中...</p>
-      </div>
-    )
-  }
 
   return (
     <div className="flex-1 overflow-y-auto p-8">

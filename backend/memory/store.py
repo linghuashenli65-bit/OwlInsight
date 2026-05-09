@@ -81,6 +81,11 @@ class MemoryStore:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT ''
+            );
+
             CREATE TABLE IF NOT EXISTS conversations (
                 id TEXT PRIMARY KEY,
                 title TEXT DEFAULT '新对话',
@@ -381,6 +386,18 @@ class MemoryStore:
             result.append(d)
         return result
 
+    def get_note_by_id(self, note_id: int) -> Optional[dict[str, Any]]:
+        """按 ID 获取笔记完整内容."""
+        row = self.conn.execute(
+            "SELECT * FROM notes WHERE id = ?", (note_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        d = dict(row)
+        d["metrics"] = json.loads(d.get("metrics", "[]"))
+        d["tags"] = json.loads(d.get("tags", "[]"))
+        return d
+
     def delete_note(self, note_id: int) -> None:
         """删除指定笔记."""
         self.conn.execute("DELETE FROM notes WHERE id = ?", (note_id,))
@@ -588,7 +605,29 @@ class MemoryStore:
         ).fetchone()
         return row["cnt"] if row else 0
 
-    # ────────── 告警偏好设置（key-value，与 MySQL app_settings 同步）──────────
+    # ────────── 通用设置（key-value，替代 MySQL app_settings）──────────
+
+    def get_all_settings(self) -> dict[str, str]:
+        """读取所有设置."""
+        rows = self.conn.execute("SELECT key, value FROM app_settings").fetchall()
+        return {r["key"]: r["value"] for r in rows}
+
+    def get_setting(self, key: str, default: str = "") -> str:
+        """读取单条设置."""
+        row = self.conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+
+    def save_settings(self, data: dict[str, str]) -> None:
+        """批量保存设置."""
+        for key, value in data.items():
+            self.conn.execute(
+                "INSERT INTO app_settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, value),
+            )
+        self.conn.commit()
+
+    # ────────── 告警偏好设置（key-value）──────────
 
     def set_preference(self, key: str, value: str) -> None:
         """设置一条偏好."""

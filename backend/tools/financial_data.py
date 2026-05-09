@@ -48,6 +48,10 @@ def _is_hk_code(code: str) -> bool:
     """判断是否为港股代码（5 位纯数字）. """
     return len(code) == 5 and code.isdigit()
 
+def _is_us_code(code: str) -> bool:
+    """判断是否为美股代码（纯字母 ticker，2-6 位）. """
+    return code.isalpha() and 1 <= len(code) <= 6
+
 def _to_symbol(code: str) -> str:
     """转为 akshare 所需的 symbol 格式.
 
@@ -64,8 +68,6 @@ def _to_tx_symbol(code: str) -> str:
     """
     if _is_hk_code(code):
         return f"hk{code}"
-    if code in ("000001", "000300", "000688"):
-        return f"sh{code}"
     if code in ("000001", "000300", "000688"):
         return f"sh{code}"
     return f"sh{code}" if code.startswith("6") else f"sz{code}"
@@ -138,6 +140,11 @@ def get_financials(symbol: str, period: str = "annual") -> list[dict[str, Any]]:
                 "raw_data": row.to_dict(),
             })
         return results
+
+    # ── 美股分支 ──
+    if _is_us_code(symbol):
+        logger.info("美股利润表暂不支持（%s）", symbol)
+        return []
 
     # ── A 股分支 ──
     latest_year_end = f"{date.today().year - 1}1231"
@@ -252,6 +259,11 @@ def get_balance_sheet(symbol: str, period: str = "annual") -> list[dict[str, Any
             })
         return results
 
+    # ── 美股分支 ──
+    if _is_us_code(symbol):
+        logger.info("美股资产负债表暂不支持（%s）", symbol)
+        return []
+
     # ── A 股分支 ──
     code = _to_symbol(symbol)
     for params in [
@@ -301,6 +313,11 @@ def get_cash_flow(symbol: str, period: str = "annual") -> list[dict[str, Any]]:
     # ── 港股分支（暂不支持，港股 API 返回粒度数据需复杂汇总）──
     if _is_hk_code(symbol):
         logger.info("港股现金流量表暂不支持（%s）", symbol)
+        return []
+
+    # ── 美股分支 ──
+    if _is_us_code(symbol):
+        logger.info("美股现金流量表暂不支持（%s）", symbol)
         return []
 
     # ── A 股分支 ──
@@ -396,6 +413,37 @@ def get_stock_price_history(
         logger.warning("获取港股股价失败 (%s): %s", symbol, last_err or "空数据")
         return []
 
+    # ── 美股接口 ──
+    if _is_us_code(symbol):
+        try:
+            df = ak.stock_us_hist(
+                symbol=symbol,
+                period="daily",
+                start_date=start_date,
+                end_date=end_date,
+                adjust="qfq",
+            )
+            if df is not None and not df.empty:
+                results = []
+                for _, row in df.iterrows():
+                    date_val = row.get("日期")
+                    date_str = date_val.isoformat() if hasattr(date_val, "isoformat") else str(date_val)
+                    results.append({
+                        "symbol": symbol,
+                        "date": date_str,
+                        "open": _safe_float(row.get("开盘")),
+                        "close": _safe_float(row.get("收盘")),
+                        "high": _safe_float(row.get("最高")),
+                        "low": _safe_float(row.get("最低")),
+                        "volume": _safe_float(row.get("成交量")),
+                        "amount": _safe_float(row.get("成交额")),
+                        "change_pct": _safe_float(row.get("涨跌幅")),
+                    })
+                return results
+        except Exception as e:
+            logger.warning("获取美股股价失败 (%s): %s", symbol, e)
+            return []
+
     # ── A 股腾讯接口 ──
     try:
         tx_symbol = _to_tx_symbol(symbol)
@@ -433,9 +481,11 @@ def get_valuation_data(symbol: str) -> dict[str, Any]:
 
     港股 5 位代码不适用于 A 股估值接口，直接返回空。
     """
-    # 港股不支持
     if _is_hk_code(symbol):
         logger.info("港股估值数据暂不支持（%s）", symbol)
+        return {}
+    if _is_us_code(symbol):
+        logger.info("美股估值数据暂不支持（%s）", symbol)
         return {}
 
     try:
@@ -475,6 +525,14 @@ def get_company_name(symbol: str) -> str:
                     return name
         except Exception:
             pass
+
+    # 美股：从反向映射获取中文名
+    if _is_us_code(symbol):
+        from backend.stock_map import COMMON_STOCKS
+        for name, code in COMMON_STOCKS.items():
+            if code == symbol:
+                return name
+        return symbol
 
     # A 股：从 stock_yjbb_em 取公司名称
     try:

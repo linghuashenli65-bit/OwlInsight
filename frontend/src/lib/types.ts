@@ -67,9 +67,11 @@ export interface ResearchNote {
   id?: number
   company_code?: string
   company_name?: string
+  title?: string
   preview?: string
   metrics?: string[]
   tags?: string[]
+  created_at?: string
   updated_at?: string
 }
 

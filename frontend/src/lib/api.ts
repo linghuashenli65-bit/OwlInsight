@@ -52,6 +52,8 @@ export const api = {
       fetchJson('/api/data/notes'),
     get: (path: string): Promise<{ content: string } & { error?: string }> =>
       fetchJson(`/api/data/notes/${encodeURIComponent(path)}`),
+    getById: (id: number): Promise<{ content: string } & { error?: string }> =>
+      fetchJson(`/api/data/notes/detail/${id}`),
     search: (q: string): Promise<{ notes: ResearchNote[] }> =>
       fetchJson(`/api/data/notes/search?q=${encodeURIComponent(q)}`),
     save: (data: {
