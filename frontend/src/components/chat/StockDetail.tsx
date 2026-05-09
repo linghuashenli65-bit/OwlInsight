@@ -174,10 +174,7 @@ export function StockDetail({ code, name, price, changePct, onClose }: StockDeta
               ) : period === 'intraday' ? (
                 <IntradayChart points={intradayPoints} data={chartData} />
               ) : (
-                <>
-                  {candleData && <StockChart data={candleData} mode="candlestick" />}
-                  <KlineTable data={chartData} period={period} />
-                </>
+                  candleData && <StockChart data={candleData} mode="candlestick" />
               )}
             </div>
           </>
@@ -282,39 +279,6 @@ function IntradayChart({ points, data }: { points: any[]; data: any[] }) {
         </table>
       </div>
     </>
-  )
-}
-
-/* ── K线数据表 ── */
-
-function KlineTable({ data, period }: { data: any[]; period: string }) {
-  return (
-    <div className="mt-3 overflow-x-auto">
-      <table className="w-full text-xs" style={{ color: 'var(--text)' }}>
-        <thead><tr style={{ borderBottom: '1px solid var(--border-faint)' }}>
-          <th className="text-left py-1.5 px-2 font-medium" style={{ color: 'var(--text-muted)' }}>日期</th>
-          <th className="text-right py-1.5 px-2 font-medium" style={{ color: 'var(--text-muted)' }}>开盘</th>
-          <th className="text-right py-1.5 px-2 font-medium" style={{ color: 'var(--text-muted)' }}>最高</th>
-          <th className="text-right py-1.5 px-2 font-medium" style={{ color: 'var(--text-muted)' }}>最低</th>
-          <th className="text-right py-1.5 px-2 font-medium" style={{ color: 'var(--text-muted)' }}>收盘</th>
-          <th className="text-right py-1.5 px-2 font-medium" style={{ color: 'var(--text-muted)' }}>涨跌幅</th>
-          <th className="text-right py-1.5 px-2 font-medium" style={{ color: 'var(--text-muted)' }}>成交量</th>
-        </tr></thead>
-        <tbody>{data.map((row, i) => {
-          const o = row.open ?? 0; const c = row.close ?? 0; const chgPct = o ? ((c - o) / o * 100) : 0
-          const isUpDay = c >= o
-          return (<tr key={i} style={{ borderBottom: '1px solid var(--border-faint)' }}>
-            <td className="py-1.5 px-2 whitespace-nowrap">{period === 'minute' ? row.date?.slice(11, 19) : row.date?.slice(0, 10)}</td>
-            <td className="text-right py-1.5 px-2 font-mono">{o.toFixed(2)}</td>
-            <td className="text-right py-1.5 px-2 font-mono">{row.high?.toFixed(2) ?? '--'}</td>
-            <td className="text-right py-1.5 px-2 font-mono">{row.low?.toFixed(2) ?? '--'}</td>
-            <td className="text-right py-1.5 px-2 font-mono">{c.toFixed(2)}</td>
-            <td className="text-right py-1.5 px-2 font-mono" style={{ color: isUpDay ? 'var(--vermillion)' : 'var(--jade)' }}>{chgPct >= 0 ? '+' : ''}{chgPct.toFixed(2)}%</td>
-            <td className="text-right py-1.5 px-2 font-mono" style={{ color: 'var(--text-muted)' }}>{formatVolume(row.volume)}</td>
-          </tr>)
-        })}</tbody>
-      </table>
-    </div>
   )
 }
 

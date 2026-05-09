@@ -198,6 +198,12 @@ def get_stock_kline(code: str, period: str = "daily"):
     """获取 K线数据.
     period: daily(60日), weekly(60周), monthly(24月)
     """
+    from backend.cache import cache_get_json, cache_set_json
+    cache_key = f"kline:{code}:{period}"
+    cached = cache_get_json(cache_key)
+    if cached:
+        return cached
+
     try:
         import akshare as ak
         today = date.today()
@@ -262,7 +268,10 @@ def get_stock_kline(code: str, period: str = "daily"):
                     g["volume"] = (g["volume"] or 0) + (r["volume"] or 0)
             results = sorted(grouped.values(), key=lambda x: x["date"])
 
-        return {"code": code, "period": period, "data": results}
+        result = {"code": code, "period": period, "data": results}
+        # 日K/周K/月K 缓存 1 小时，这些数据变动不大
+        cache_set_json(cache_key, result, ttl=3600)
+        return result
     except Exception as e:
         logger.warning("获取K线失败 (%s/%s): %s", code, period, e)
         return {"code": code, "period": period, "data": [], "error": str(e)}
