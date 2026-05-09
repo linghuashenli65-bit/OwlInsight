@@ -19,7 +19,7 @@ logger = logging.getLogger("phase3_test")
 
 def test_intent_classify():
     """测试意图分类."""
-    from src.agent.router import classify_intent
+    from backend.agent.router import classify_intent
 
     # 1. 模糊意图
     result = classify_intent("茅台最近怎么样")
@@ -42,7 +42,7 @@ def test_intent_classify():
 
 def test_tool_plans():
     """测试工具计划生成."""
-    from src.agent.router import build_tool_plans
+    from backend.agent.router import build_tool_plans
 
     intent = {
         "intent": "financial_query",
@@ -61,8 +61,8 @@ def test_tool_plans():
 
 def test_synthesizer():
     """测试答案合成器."""
-    from src.agent.state import Anomaly, Citation
-    from src.agent.synthesizer import Synthesizer
+    from backend.agent.state import Anomaly, Citation
+    from backend.agent.synthesizer import Synthesizer
 
     s = Synthesizer()
 
@@ -103,7 +103,7 @@ def test_synthesizer():
 
 def test_full_agent_flow():
     """测试完整 Agent 流程（不依赖 LLM API 的 fallback 路径）. """
-    from src.agent.graph import run_agent
+    from backend.agent.graph import run_agent
 
     # 使用规则 fallback 分类，不走 LLM
     result = run_agent("茅台营收多少")

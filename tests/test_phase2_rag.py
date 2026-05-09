@@ -62,7 +62,7 @@ MOCK_CHUNKS = [
 
 def test_embedding() -> None:
     """测试嵌入模型."""
-    from src.rag.embeddings import embedder
+    from backend.rag.embeddings import embedder
 
     vec = embedder.embed("测试文本")
     assert len(vec) == embedder.dim, f"向量维度错误: {len(vec)} != {embedder.dim}"
@@ -75,8 +75,8 @@ def test_embedding() -> None:
 
 def test_milvus_io() -> list[int]:
     """测试 Milvus 写入和读取."""
-    from src.config import settings
-    from src.rag.vector_store import vector_store
+    from backend.config import settings
+    from backend.rag.vector_store import vector_store
 
     vector_store.connect()
     # 重建 collection（确保维度与当前模型一致）
@@ -84,7 +84,7 @@ def test_milvus_io() -> list[int]:
     print(f"[OK] Collection 已重建 (dim={settings.MILVUS_EMBEDDING_DIM})")
 
     # 写入
-    from src.rag.embeddings import embedder
+    from backend.rag.embeddings import embedder
     records = []
     for c in MOCK_CHUNKS:
         vec = embedder.embed(c["text"])
@@ -101,8 +101,8 @@ def test_milvus_io() -> list[int]:
 
 def test_time_aware_retrieve() -> None:
     """测试时间感知检索：最近三期."""
-    from src.rag.embeddings import embedder
-    from src.rag.vector_store import vector_store
+    from backend.rag.embeddings import embedder
+    from backend.rag.vector_store import vector_store
 
     # 1) 先搜索所有数据（无过滤）
     query = "利润表 营收 收入 数据"
@@ -128,8 +128,8 @@ def test_time_aware_retrieve() -> None:
 
 def test_cross_company_filter() -> None:
     """测试跨公司过滤."""
-    from src.rag.embeddings import embedder
-    from src.rag.vector_store import vector_store
+    from backend.rag.embeddings import embedder
+    from backend.rag.vector_store import vector_store
 
     expr = 'company_code == "000858"'
     # 用 query 方式（不依赖向量），直接查元数据
@@ -146,7 +146,7 @@ def test_cross_company_filter() -> None:
 
 def test_bm25_index() -> None:
     """测试 BM25 索引."""
-    from src.rag.retriever import bm25_index
+    from backend.rag.retriever import bm25_index
 
     texts = [c["text"] for c in MOCK_CHUNKS]
     bm25_index.rebuild(texts)
@@ -159,7 +159,7 @@ def test_bm25_index() -> None:
 
 def test_reranker() -> None:
     """测试重排序（仅加载验证，不依赖真实模型）. """
-    from src.rag.reranker import reranker
+    from backend.rag.reranker import reranker
 
     candidates = [
         {"text": "2024年营收1500亿元"},
@@ -174,7 +174,7 @@ def test_reranker() -> None:
 
 def test_hybrid_retrieve() -> None:
     """测试混合检索."""
-    from src.rag.retriever import hybrid_retrieve
+    from backend.rag.retriever import hybrid_retrieve
 
     results = hybrid_retrieve(
         query="茅台最近营收和利润",
@@ -189,7 +189,7 @@ def test_hybrid_retrieve() -> None:
 
 def cleanup(ids: list[int]) -> None:
     """清理测试数据."""
-    from src.rag.vector_store import vector_store
+    from backend.rag.vector_store import vector_store
     vector_store.delete(ids)
     print(f"[OK] 清理: 已删除 {len(ids)} 条测试数据")
     vector_store.close()

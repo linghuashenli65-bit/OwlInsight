@@ -1,28 +1,22 @@
-"""FinanceBot CLI 入口 — Phase 1 验证脚本."""
+"""FinanceBot CLI 入口."""
 
 import json
-import logging
 import os
 import sys
 from pathlib import Path
 
-# 公司内网代理拦截 EastMoney API 时绕过
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 os.environ.setdefault("NO_PROXY", "eastmoney.com,push2his.eastmoney.com,emot.dfcfw.com")
 
 # 确保项目根在 import path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-)
-logger = logging.getLogger("finance_bot")
+from backend.logger import logger
 
 
 def verify_config() -> None:
     """验证配置初始化."""
-    from src.config import settings
+    from backend.config import settings
     settings.ensure_dirs()
     print("[OK] 配置加载成功")
     print(f"    DATA_DIR       = {settings.DATA_DIR}")
@@ -33,7 +27,7 @@ def verify_config() -> None:
 
 def verify_memory() -> None:
     """验证 SQLite 记忆模块."""
-    from src.memory.store import memory_store
+    from backend.memory.store import memory_store
     memory_store.connect()
 
     # 测试增删查
@@ -61,7 +55,7 @@ def verify_memory() -> None:
 
 def verify_vector_store() -> None:
     """验证 Milvus 向量库."""
-    from src.rag.vector_store import vector_store
+    from backend.rag.vector_store import vector_store
     vector_store.connect()
 
     collection_name = "finance_test"
@@ -78,7 +72,7 @@ def verify_vector_store() -> None:
 
 def verify_financial_data() -> None:
     """验证 akshare 金融数据模块."""
-    from src.tools.financial_data import (
+    from backend.tools.financial_data import (
         get_company_name,
         get_financials,
         get_stock_price_history,

@@ -1,5 +1,7 @@
 # ──────────── 安全 ────────────
 .env
+.env.local
+*.key
 
 # ──────────── Python ────────────
 __pycache__/
@@ -13,13 +15,30 @@ venv/
 
 # ──────────── 数据 ────────────
 data/memory.db
+data/memory.db-wal
+data/memory.db-shm
 data/vector_store/
 data/research_notes/
+data/logs/
+data/tmp/
+*.log
 
 # ──────────── IDE ────────────
 .idea/
 .vscode/
+*.swp
+*.swo
 
 # ──────────── OS ────────────
 .DS_Store
 Thumbs.db
+
+# ──────────── Node / Frontend ────────────
+node_modules/
+.next/
+out/
+
+# ──────────── Python test cache ────────────
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

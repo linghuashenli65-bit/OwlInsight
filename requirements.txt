@@ -17,3 +17,5 @@ httpx>=0.28.0
 duckduckgo-search>=6.0.0
 PyMuPDF>=1.24.0
 tqdm>=4.66.0
+redis>=5.0.0
+apscheduler>=3.10.0

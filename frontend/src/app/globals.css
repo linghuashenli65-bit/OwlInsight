@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ──────────── 品牌字体 ──────────── */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap');
+
+/* ──────────── CSS 变量（主题） ──────────── */
+:root {
+  --brand: #c41e3a;
+  --vermillion: #c41e3a;
+  --brand-light: #fef2f2;
+  --gold: #c9a96e;
+  --gold-light: #fefce8;
+  --jade: #2d5a4a;
+}
+
+.dark {
+  --bg: #080808;
+  --bg-alt: #0e0c0a;
+  --card: #161412;
+  --card-hover: #1e1b17;
+  --border: #2a2520;
+  --border-faint: #1c1814;
+  --text: #e8e4db;
+  --text-sec: #8c867c;
+  --text-muted: #5c5650;
+  --vermillion-bg: rgba(196, 30, 58, 0.08);
+  --gold-bg: rgba(201, 169, 110, 0.08);
+  --shadow: rgba(0, 0, 0, 0.4);
+  --input-bg: #0e0c0a;
+  --noise-opacity: 0.03;
+  --scrollbar-thumb: #2a2520;
+}
+
+.light {
+  --bg: #f8f6f2;
+  --bg-alt: #f2f0ea;
+  --card: #ffffff;
+  --card-hover: #faf9f5;
+  --border: #e0dbd0;
+  --border-faint: #eee9e0;
+  --text: #2a2520;
+  --text-sec: #6b6560;
+  --text-muted: #a09890;
+  --vermillion-bg: rgba(183, 28, 28, 0.05);
+  --gold-bg: rgba(141, 110, 59, 0.06);
+  --shadow: rgba(0, 0, 0, 0.06);
+  --input-bg: #ffffff;
+  --noise-opacity: 0.02;
+  --scrollbar-thumb: #d0cbc0;
+}
+
+/* ──────────── 全局重置 ──────────── */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: Georgia, 'Noto Serif SC', serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 噪点纹理 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+/* ──────────── 滚动条 ──────────── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ──────────── 消息气泡组件样式 ──────────── */
+@layer components {
+  .message-bubble-user {
+    background: linear-gradient(160deg, #c41e3a, #8b1a2b);
+    color: #faf8f4;
+    border-radius: 2px 2px 0 2px;
+  }
+
+  .message-bubble-ai {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border-faint);
+    border-radius: 2px 2px 2px 0;
+    box-shadow: 0 1px 4px var(--shadow);
+  }
+
+  /* 引用上标 */
+  .citation-sup {
+    color: var(--brand);
+    font-weight: 600;
+    cursor: help;
+    font-size: 0.68em;
+    vertical-align: super;
+    position: relative;
+    text-decoration: none;
+    font-family: Georgia, serif;
+  }
+
+  /* 数据状态卡片 */
+  .status-card {
+    background: var(--gold-bg);
+    border-left: 2px solid var(--gold);
+  }
+
+  /* 异常卡片 */
+  .anomaly-card {
+    background: var(--vermillion-bg);
+    border-left: 2px solid var(--brand);
+  }
+
+  /* 引用卡片 */
+  .refs-card {
+    background: var(--card);
+    border: 1px solid var(--border-faint);
+  }
+}
+
+/* ──────────── Prose/Markdown 覆盖 ──────────── */
+.prose-custom {
+  line-height: 1.72;
+  font-size: 0.93rem;
+  color: var(--text);
+}
+
+.prose-custom p {
+  margin: 0.6em 0;
+}
+
+.prose-custom table {
+  font-size: 0.82em;
+  border-collapse: collapse;
+  margin: 10px 0;
+  width: 100%;
+  background: var(--bg-alt);
+}
+
+.prose-custom th {
+  background: transparent;
+  color: var(--brand);
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--brand);
+  font-weight: 600;
+  text-align: left;
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-size: 0.85em;
+  letter-spacing: 0.03em;
+}
+
+.prose-custom td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-faint);
+  font-variant-numeric: tabular-nums;
+}
