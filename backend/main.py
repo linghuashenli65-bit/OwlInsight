@@ -14,7 +14,7 @@ from pathlib import Path
 # 必须在任何第三方库导入之前设置
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ.setdefault("NO_PROXY", "eastmoney.com,push2his.eastmoney.com,emot.dfcfw.com")
+os.environ["NO_PROXY"] = os.environ.get("NO_PROXY", "") + ",eastmoney.com,push2his.eastmoney.com,push2.eastmoney.com,emot.dfcfw.com"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

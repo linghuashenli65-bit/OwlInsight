@@ -385,32 +385,107 @@ def _safe_float_num(val) -> float | None:
 
 @router.get("/stock/{code}/fund-flow")
 def get_stock_fund_flow(code: str):
-    """获取个股资金流向（主力/散户）."""
-    try:
-        import akshare as ak
-        df = ak.stock_individual_fund_flow(stock=code, market="sh" if code.startswith("6") else "sz")
-        if df is None or df.empty:
-            return {"code": code, "data": []}
+    """获取个股资金流向（主力/散户），绕过系统代理直连 eastmoney."""
+    from backend.cache import cache_get_json, cache_set_json
+    cache_key = f"fund_flow:{code}"
+    cached = cache_get_json(cache_key)
+    if cached:
+        return cached
 
-        results = []
-        for _, row in df.head(20).iterrows():
-            results.append({
-                "date": str(row.get("日期", "")),
-                "main_net": _safe_float_num(row.get("主力净流入-净额")),
-                "main_pct": _safe_float_num(row.get("主力净流入-净占比")),
-                "super_large_net": _safe_float_num(row.get("超大单净流入-净额")),
-                "super_large_pct": _safe_float_num(row.get("超大单净流入-净占比")),
-                "large_net": _safe_float_num(row.get("大单净流入-净额")),
-                "large_pct": _safe_float_num(row.get("大单净流入-净占比")),
-                "medium_net": _safe_float_num(row.get("中单净流入-净额")),
-                "medium_pct": _safe_float_num(row.get("中单净流入-净占比")),
-                "small_net": _safe_float_num(row.get("小单净流入-净额")),
-                "small_pct": _safe_float_num(row.get("小单净流入-净占比")),
-            })
-        return {"code": code, "data": results}
+    # 非 A 股不支持资金流向
+    if not code.isdigit() or len(code) != 6:
+        return {"code": code, "data": []}
+
+    try:
+        data = _fetch_fund_flow_from_em(code)
+        result = {"code": code, "data": data}
+        if data:
+            cache_set_json(cache_key, result, ttl=3600)
+        return result
     except Exception as e:
         logger.warning("获取资金流向失败 (%s): %s", code, e)
         return {"code": code, "data": [], "error": str(e)}
+
+
+def _fetch_fund_flow_from_em(code: str) -> list[dict]:
+    """直连 eastmoney push2his API 获取个股资金流向，绕过系统代理."""
+    import time
+
+    market = "1" if code.startswith("6") else "0"
+    url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
+    params = {
+        "lmt": "0",
+        "klt": "101",
+        "secid": f"{market}.{code}",
+        "fields1": "f1,f2,f3,f7",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
+        "ut": "b2884a393a59ad64002292a3e90d46a5",
+        "_": str(int(time.time() * 1000)),
+    }
+
+    # 方案 A：requests + trust_env=False（绕过 HTTP_PROXY/HTTPS_PROXY 环境变量）
+    import requests as _req
+    sess = _req.Session()
+    sess.trust_env = False
+    try:
+        resp = sess.get(url, params=params, timeout=10, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://data.eastmoney.com/",
+        })
+        resp.raise_for_status()
+        klines = resp.json().get("data", {}).get("klines", [])
+        if klines:
+            return _parse_fund_flow_klines(klines)
+    except Exception as e:
+        logger.debug("资金流向 requests 方式失败 (%s)，尝试 urllib 回退: %s", code, e)
+
+    # 方案 B：urllib + ProxyHandler({})（绕过 Windows 系统代理）
+    import urllib.request as _urllib_req
+    import json as _json
+    proxy_handler = _urllib_req.ProxyHandler({})
+    opener = _urllib_req.build_opener(proxy_handler)
+    req = _urllib_req.Request(
+        f"{url}?{'&'.join(f'{k}={v}' for k, v in params.items())}",
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://data.eastmoney.com/",
+        },
+    )
+    resp = opener.open(req, timeout=10)
+    raw = _json.loads(resp.read().decode())
+    klines = raw.get("data", {}).get("klines", [])
+    return _parse_fund_flow_klines(klines)
+
+
+def _parse_fund_flow_klines(klines: list[str]) -> list[dict]:
+    """解析 eastmoney 资金流向 K 线数据.
+
+    API 返回格式（f51~f65 逗号分隔）:
+      date, main_net, small_net, medium_net, large_net, super_large_net,
+      main_pct, small_pct, medium_pct, large_pct, super_large_pct,
+      close, change_pct, -, -
+    """
+    results = []
+    for line in klines:
+        parts = line.split(",")
+        if len(parts) < 11:
+            continue
+        results.append({
+            "date": parts[0],
+            "main_net": _safe_float_num(parts[1]),
+            "main_pct": _safe_float_num(parts[6]),
+            "super_large_net": _safe_float_num(parts[5]),
+            "super_large_pct": _safe_float_num(parts[10]),
+            "large_net": _safe_float_num(parts[4]),
+            "large_pct": _safe_float_num(parts[9]),
+            "medium_net": _safe_float_num(parts[3]),
+            "medium_pct": _safe_float_num(parts[8]),
+            "small_net": _safe_float_num(parts[2]),
+            "small_pct": _safe_float_num(parts[7]),
+        })
+    # eastmoney 按日期降序排列，取最近 20 条
+    results.sort(key=lambda r: r["date"], reverse=True)
+    return results[:20]
 
 
 # ─────────────────── 机构持仓 ───────────────────

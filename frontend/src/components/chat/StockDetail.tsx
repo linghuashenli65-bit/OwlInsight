@@ -13,7 +13,7 @@ interface StockDetailProps {
   onClose: () => void
 }
 
-type ViewTab = 'kline' | 'fund' | 'inst'
+type ViewTab = 'kline' | 'fund'
 type Period = 'intraday' | 'minute' | 'daily' | 'weekly' | 'monthly'
 
 export function StockDetail({ code, name, price, changePct, onClose }: StockDetailProps) {
@@ -22,7 +22,6 @@ export function StockDetail({ code, name, price, changePct, onClose }: StockDeta
   const [minuteInterval, setMinuteInterval] = useState(5)
   const [chartData, setChartData] = useState<any[]>([])
   const [fundData, setFundData] = useState<any[]>([])
-  const [instData, setInstData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const isUp = (changePct ?? 0) >= 0
@@ -40,11 +39,8 @@ export function StockDetail({ code, name, price, changePct, onClose }: StockDeta
         api.stock.kline(code, period).then((r) => { setChartData(r.data || []); setLoading(false) })
           .catch(() => setLoading(false))
       }
-    } else if (viewTab === 'fund') {
-      api.stock.fundFlow(code).then((r) => { setFundData(r.data || []); setLoading(false) })
-        .catch(() => setLoading(false))
     } else {
-      api.stock.institution(code).then((r) => { setInstData(r.data || []); setLoading(false) })
+      api.stock.fundFlow(code).then((r) => { setFundData(r.data || []); setLoading(false) })
         .catch(() => setLoading(false))
     }
   }, [viewTab, period, minuteInterval, code])
@@ -125,7 +121,6 @@ export function StockDetail({ code, name, price, changePct, onClose }: StockDeta
           {([
             { key: 'kline' as ViewTab, label: 'K线图' },
             { key: 'fund' as ViewTab, label: '资金流向' },
-            { key: 'inst' as ViewTab, label: '机构持仓' },
           ]).map((t) => (
             <button key={t.key} onClick={() => setViewTab(t.key)}
               className="px-4 py-2.5 text-xs font-medium transition-colors"
@@ -167,7 +162,7 @@ export function StockDetail({ code, name, price, changePct, onClose }: StockDeta
             </div>
 
             <div className="p-4">
-              {loading ? (
+              {loading && chartData.length === 0 ? (
                 <div className="text-xs py-8 text-center" style={{ color: 'var(--text-muted)' }}>加载中...</div>
               ) : chartData.length === 0 ? (
                 <div className="text-xs py-8 text-center" style={{ color: 'var(--text-muted)' }}>暂无数据</div>
@@ -181,7 +176,7 @@ export function StockDetail({ code, name, price, changePct, onClose }: StockDeta
         ) : viewTab === 'fund' ? (
           /* ── 资金流向 ── */
           <div className="p-4">
-            {loading ? (
+            {loading && fundData.length === 0 ? (
               <div className="text-xs py-8 text-center" style={{ color: 'var(--text-muted)' }}>加载中...</div>
             ) : fundData.length === 0 ? (
               <div className="text-xs py-8 text-center" style={{ color: 'var(--text-muted)' }}>暂无资金流向数据</div>
@@ -214,31 +209,7 @@ export function StockDetail({ code, name, price, changePct, onClose }: StockDeta
               </div>
             )}
           </div>
-        ) : (
-          /* ── 机构持仓 ── */
-          <div className="p-4">
-            {loading ? (
-              <div className="text-xs py-8 text-center" style={{ color: 'var(--text-muted)' }}>加载中...</div>
-            ) : instData.length === 0 ? (
-              <div className="text-xs py-8 text-center" style={{ color: 'var(--text-muted)' }}>暂无机构持仓数据</div>
-            ) : (
-              <div className="space-y-2">
-                {instData.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded" style={{ background: 'var(--card)', border: '1px solid var(--border-faint)' }}>
-                    <div>
-                      <div className="text-sm font-medium" style={{ color: 'var(--text)' }}>{item.name}</div>
-                      {item.hold_pct != null && <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>占比 {item.hold_pct.toFixed(2)}%</div>}
-                    </div>
-                    <div className="text-right">
-                      {item.hold_shares != null && <div className="text-xs" style={{ color: 'var(--text)' }}>{formatShares(item.hold_shares)}</div>}
-                      {item.hold_value != null && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatMoney(item.hold_value)}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   )
@@ -291,13 +262,6 @@ function formatMoney(val: number | null): string {
   if (abs >= 1e8) return `${sign}${(abs / 1e8).toFixed(2)}亿`
   if (abs >= 1e4) return `${sign}${(abs / 1e4).toFixed(2)}万`
   return `${sign}${abs.toFixed(0)}`
-}
-
-function formatShares(val: number | null): string {
-  if (val == null) return '--'
-  if (val >= 1e8) return `${(val / 1e8).toFixed(2)}亿股`
-  if (val >= 1e4) return `${(val / 1e4).toFixed(2)}万股`
-  return `${val.toFixed(0)}股`
 }
 
 function formatVolume(val: number | null | undefined): string {
